@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频字幕提取与关键词生成工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 2px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .file-upload {
+            border: 2px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: #f0f4ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-upload:hover {
+            background: #e8edff;
+            border-color: #764ba2;
+        }
+
+        .file-upload.dragover {
+            background: #d6e0ff;
+            border-color: #764ba2;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-box {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .keywords-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .keyword-tag {
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .file-list {
+            margin-top: 15px;
+        }
+
+        .file-item {
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-name {
+            flex: 1;
+            color: #333;
+        }
+
+        .file-status {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>视频字幕提取与关键词生成工具</h1>
+        <p class="subtitle">支持批量上传视频，自动提取字幕，生成关键词和摘要</p>
+
+        <!-- 步骤1: 文件上传和转录 -->
+        <div class="section">
+            <div class="section-title">步骤 1: 上传视频文件并提取字幕</div>
+            
+            <div class="form-group">
+                <div class="file-upload" id="fileUpload">
+                    <p>点击或拖拽视频文件到此处</p>
+                    <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                        支持格式: MP4, AVI, MOV, MKV, MP3, WAV 等
+                    </p>
+                    <input type="file" id="fileInput" multiple accept="video/*,audio/*">
+                </div>
+            </div>
+
+            <div class="file-list" id="fileList"></div>
+
+            <div class="status" id="transcribeStatus"></div>
+            <div class="loading" id="transcribeLoading">
+                <div class="spinner"></div>
+                <p>正在转录音频，请稍候...</p>
+            </div>
+        </div>
+
+        <!-- 步骤2: 输入信息 -->
+        <div class="section">
+            <div class="section-title">步骤 2: 输入视频信息（可选）</div>
+            
+            <div class="form-group">
+                <label>标题:</label>
+                <input type="text" id="title" placeholder="视频标题">
+            </div>
+
+            <div class="form-group">
+                <label>报告人:</label>
+                <input type="text" id="speakerName" placeholder="报告人姓名">
+            </div>
+
+            <div class="form-group">
+                <label>原摘要/描述:</label>
+                <textarea id="originalAbstract" placeholder="输入原始摘要或描述（可选）"></textarea>
+            </div>
+        </div>
+
+        <!-- 步骤3: API Key 和关键词提取 -->
+        <div class="section">
+            <div class="section-title">步骤 3: 提取关键词</div>
+            
+            <div class="form-group">
+                <label>OpenAI API Key:</label>
+                <input type="password" id="apiKey" placeholder="sk-...">
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    API Key 仅用于调用 OpenAI，不会上传到服务器
+                </small>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="useOpenAI" checked>
+                    <label for="useOpenAI">使用 OpenAI GPT 提取关键词（更准确）</label>
+                </div>
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    取消勾选将使用本地 jieba 分词（免费但准确度较低）
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label>转录文本（自动填充）:</label>
+                <textarea id="transcript" placeholder="转录文本将自动显示在这里"></textarea>
+            </div>
+
+            <button class="btn btn-primary" onclick="extractKeywords()">提取关键词</button>
+            
+            <div class="status" id="keywordsStatus"></div>
+            <div class="loading" id="keywordsLoading">
+                <div class="spinner"></div>
+                <p>正在提取关键词...</p>
+            </div>
+
+            <div class="result-box" id="keywordsResult" style="display: none;">
+                <strong>提取的关键词:</strong>
+                <div class="keywords-list" id="keywordsList"></div>
+                <textarea id="keywordsText" style="margin-top: 15px; min-height: 60px;" readonly></textarea>
+            </div>
+        </div>
+
+        <!-- 步骤4: 生成摘要 -->
+        <div class="section">
+            <div class="section-title">步骤 4: 生成摘要（可选）</div>
+            
+            <div class="form-group">
+                <label>摘要字数:</label>
+                <input type="number" id="abstractLength" value="400" min="100" max="2000" step="50" style="width: 150px;">
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    建议 300-500 字，可根据需要调整
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label>选择输入源（可多选）:</label>
+                <div class="checkbox-group" style="flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="useOriginalAbstract" checked>
+                        <span>原摘要/描述</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="useKeywords" checked>
+                        <span>关键词</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="useTranscript" checked>
+                        <span>转录文本</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>主要内容来源（单选）:</label>
+                <div style="margin-top: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <input type="radio" name="mainSource" value="transcript" checked>
+                        <span>以转录文本为主</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <input type="radio" name="mainSource" value="abstract">
+                        <span>以原摘要为主</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="radio" name="mainSource" value="balanced">
+                        <span>平衡使用（推荐）</span>
+                    </label>
+                </div>
+            </div>
+
+            <button class="btn btn-success" onclick="generateAbstract()">生成摘要</button>
+            
+            <div class="status" id="abstractStatus"></div>
+            <div class="loading" id="abstractLoading">
+                <div class="spinner"></div>
+                <p>正在生成摘要...</p>
+            </div>
+
+            <div class="result-box" id="abstractResult" style="display: none;">
+                <strong>生成的摘要:</strong>
+                <textarea id="abstractText" style="margin-top: 10px; min-height: 150px;" readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let currentTranscript = '';
+        let currentKeywords = [];
+
+
+        const fileUpload = document.getElementById('fileUpload');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+
+        fileUpload.addEventListener('click', () => fileInput.click());
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
+        });
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                uploadAndTranscribe(file);
+            });
+        }
+
+        function uploadAndTranscribe(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <span class="file-name">${file.name}</span>
+                <span class="file-status">处理中...</span>
+            `;
+            fileList.appendChild(fileItem);
+
+            showStatus('transcribeStatus', '正在上传并转录音频...', 'info');
+
+            fetch(`${API_BASE}/api/transcribe`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                // 检查响应状态
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`服务器错误 (${response.status}): ${errorText || response.statusText}`);
+                }
+                
+                // 检查内容类型
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error(`服务器返回非 JSON 响应: ${text.substring(0, 200)}`);
+                }
+                
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    fileItem.querySelector('.file-status').textContent = '✓ 完成';
+                    fileItem.querySelector('.file-status').style.color = '#28a745';
+                    
+                    // 自动填充转录文本
+                    currentTranscript = data.transcript;
+                    document.getElementById('transcript').value = data.transcript;
+                    
+                    // 自动清洗文本
+                    cleanTranscript(data.transcript, file.name);
+                    
+                    showStatus('transcribeStatus', '转录完成！', 'success');
+                } else {
+                    fileItem.querySelector('.file-status').textContent = '✗ 失败';
+                    fileItem.querySelector('.file-status').style.color = '#dc3545';
+                    showStatus('transcribeStatus', data.error || '转录失败', 'error');
+                }
+            })
+            .catch(error => {
+                fileItem.querySelector('.file-status').textContent = '✗ 错误';
+                fileItem.querySelector('.file-status').style.color = '#dc3545';
+                console.error('上传错误详情:', error);
+                showStatus('transcribeStatus', '上传失败: ' + error.message, 'error');
+            });
+        }
+
+        function cleanTranscript(transcript, filename) {
+            fetch(`${API_BASE}/api/clean-transcript`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    transcript: transcript,
+                    filename: filename
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentTranscript = data.cleaned_transcript;
+                    document.getElementById('transcript').value = data.cleaned_transcript;
+                }
+            })
+            .catch(error => {
+                console.error('清洗失败:', error);
+            });
+        }
+
+        function extractKeywords() {
+            const transcript = document.getElementById('transcript').value;
+            const description = document.getElementById('originalAbstract').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const useOpenAI = document.getElementById('useOpenAI').checked;
+
+            if (!transcript && !description) {
+                showStatus('keywordsStatus', '请先上传视频或输入描述', 'error');
+                return;
+            }
+
+            if (useOpenAI && !apiKey) {
+                showStatus('keywordsStatus', '使用 OpenAI 需要输入 API Key', 'error');
+                return;
+            }
+
+            showLoading('keywordsLoading', true);
+            hideStatus('keywordsStatus');
+            document.getElementById('keywordsResult').style.display = 'none';
+
+            fetch(`${API_BASE}/api/extract-keywords`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    transcript: transcript,
+                    description: description,
+                    api_key: apiKey,
+                    use_openai: useOpenAI
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading('keywordsLoading', false);
+                if (data.success) {
+                    currentKeywords = data.keywords || [];
+                    displayKeywords(data.keywords || [], data.keywords_str || '');
+                    showStatus('keywordsStatus', '关键词提取成功！', 'success');
+                } else {
+                    showStatus('keywordsStatus', data.error || '提取失败', 'error');
+                }
+            })
+            .catch(error => {
+                showLoading('keywordsLoading', false);
+                showStatus('keywordsStatus', '提取失败: ' + error.message, 'error');
+            });
+        }
+
+        function displayKeywords(keywords, keywordsStr) {
+            const keywordsList = document.getElementById('keywordsList');
+            keywordsList.innerHTML = '';
+            
+            keywords.forEach(keyword => {
+                const tag = document.createElement('span');
+                tag.className = 'keyword-tag';
+                tag.textContent = keyword;
+                keywordsList.appendChild(tag);
+            });
+
+            document.getElementById('keywordsText').value = keywordsStr;
+            document.getElementById('keywordsResult').style.display = 'block';
+        }
+
+        function generateAbstract() {
+            const originalAbstract = document.getElementById('originalAbstract').value;
+            const keywords = document.getElementById('keywordsText').value;
+            const title = document.getElementById('title').value;
+            const speakerName = document.getElementById('speakerName').value;
+            const transcript = document.getElementById('transcript').value;
+            const apiKey = document.getElementById('apiKey').value;
+            
+            // 获取用户设置
+            const abstractLength = parseInt(document.getElementById('abstractLength').value) || 400;
+            const useOriginalAbstract = document.getElementById('useOriginalAbstract').checked;
+            const useKeywords = document.getElementById('useKeywords').checked;
+            const useTranscript = document.getElementById('useTranscript').checked;
+            const mainSource = document.querySelector('input[name="mainSource"]:checked').value;
+
+            if (!apiKey) {
+                showStatus('abstractStatus', '需要 OpenAI API Key', 'error');
+                return;
+            }
+
+            // 检查至少选择了一个输入源
+            if (!useOriginalAbstract && !useKeywords && !useTranscript) {
+                showStatus('abstractStatus', '请至少选择一个输入源', 'error');
+                return;
+            }
+
+            // 检查选中的输入源是否有内容
+            if (useOriginalAbstract && !originalAbstract.trim()) {
+                showStatus('abstractStatus', '已选择原摘要但内容为空', 'error');
+                return;
+            }
+            if (useKeywords && !keywords.trim()) {
+                showStatus('abstractStatus', '已选择关键词但内容为空', 'error');
+                return;
+            }
+            if (useTranscript && !transcript.trim()) {
+                showStatus('abstractStatus', '已选择转录文本但内容为空', 'error');
+                return;
+            }
+
+            showLoading('abstractLoading', true);
+            hideStatus('abstractStatus');
+            document.getElementById('abstractResult').style.display = 'none';
+
+            fetch(`${API_BASE}/api/generate-abstract`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    original_abstract: useOriginalAbstract ? originalAbstract : '',
+                    keywords: useKeywords ? keywords : '',
+                    title: title,
+                    speaker_name: speakerName,
+                    transcript: useTranscript ? transcript : '',
+                    api_key: apiKey,
+                    abstract_length: abstractLength,
+                    main_source: mainSource,
+                    use_original_abstract: useOriginalAbstract,
+                    use_keywords: useKeywords,
+                    use_transcript: useTranscript
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading('abstractLoading', false);
+                if (data.success) {
+                    document.getElementById('abstractText').value = data.abstract;
+                    document.getElementById('abstractResult').style.display = 'block';
+                    showStatus('abstractStatus', '摘要生成成功！', 'success');
+                } else {
+                    showStatus('abstractStatus', data.error || '生成失败', 'error');
+                }
+            })
+            .catch(error => {
+                showLoading('abstractLoading', false);
+                showStatus('abstractStatus', '生成失败: ' + error.message, 'error');
+            });
+        }
+
+        function showStatus(id, message, type) {
+            const status = document.getElementById(id);
+            status.textContent = message;
+            status.className = `status ${type} show`;
+        }
+
+        function hideStatus(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        function showLoading(id, show) {
+            document.getElementById(id).classList.toggle('show', show);
+        }
+    </script>
+</body>
+</html>
+
