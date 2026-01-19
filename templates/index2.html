@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG智能搜索引擎 - 视频内容分析工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            list-style: none;
+            margin-bottom: 20px;
+            border-radius: 12px;
+        }
+
+        .navbar .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .navbar li:not(.logo) {
+            margin-left: 20px;
+        }
+
+        .navbar a {
+            text-decoration: none;
+            color: #333;
+            font-size: 16px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+
+        .navbar a:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .search-section {
+            margin-bottom: 30px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .ai-analysis {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .ai-analysis.show {
+            display: block;
+        }
+
+        .ai-analysis h3 {
+            color: #2196F3;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .ai-analysis .category-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .category-tag {
+            background: #2196F3;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .keyword-tag {
+            background: #4CAF50;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .result-item:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .result-title {
+            font-size: 20px;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .result-meta {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .result-meta span {
+            margin-right: 15px;
+        }
+
+        .result-categories {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .result-category {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        .result-content {
+            color: #333;
+            line-height: 1.8;
+            margin-top: 15px;
+            max-height: 200px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .result-content.expanded {
+            max-height: none;
+        }
+
+        .result-content p {
+            margin: 10px 0;
+        }
+
+        .result-content strong {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .result-content em {
+            font-style: italic;
+        }
+
+        .result-content a {
+            color: #667eea;
+            text-decoration: underline;
+        }
+
+        .expand-btn {
+            color: #667eea;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 14px;
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            display: none;
+        }
+
+        .no-results.show {
+            display: block;
+        }
+
+        .filter-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .filter-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .filter-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .filter-tag {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .filter-tag:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .filter-tag.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul class="navbar">
+            <li class="logo">
+                <a href="home.html">
+                    <span class="logo-text">📹 视频内容分析工具</span>
+                </a>
+            </li>
+            <li><a href="index.html">Video Content Analysis</a></li>
+            <li><a href="/index2.html">Expert Opinion Generation (RAG)</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <h1> RAG智能搜索引擎</h1>
+        <p class="subtitle">基于向量数据库的智能学术报告检索系统，支持语义搜索和分类筛选</p>
+
+        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <strong> 配置提示：</strong>
+            <p style="margin: 10px 0 0 0; color: #666;">
+                请在 <a href="index.html" style="color: #667eea;">Video Content Analysis</a> 页面的全局配置中输入 <strong>Gemini API Key</strong>，用于查询意图分析。
+            </p>
+        </div>
+
+        <div class="search-section">
+            <div class="search-box">
+                <input type="text" id="searchQuery" placeholder="输入您要搜索的内容，例如：钙钛矿太阳能电池、AI蛋白质设计、量子计算..." style="font-size: 16px;">
+                <button class="btn btn-primary" onclick="performSearch()" id="searchBtn">搜索</button>
+            </div>
+
+            <div class="ai-analysis" id="aiAnalysis">
+                <h3> AI分析结果</h3>
+                <div id="aiAnalysisContent"></div>
+            </div>
+
+            <div class="filter-section">
+                <h3> 分类筛选</h3>
+                <div class="filter-tags" id="categoryFilters">
+                </div>
+            </div>
+
+            <div class="status" id="searchStatus"></div>
+            <div class="loading" id="searchLoading">
+                <div class="spinner"></div>
+                <p>正在搜索，请稍候...</p>
+            </div>
+        </div>  
+
+        <div class="results-section">
+            <div class="no-results" id="noResults">
+                <p style="font-size: 18px; margin-bottom: 10px;"> 暂无搜索结果</p>
+                <p>请尝试其他关键词或清除筛选条件</p>
+            </div>
+            <div id="searchResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let API_BASE = window.location.origin;
+        const currentPort = window.location.port;
+        if (currentPort === '5500' || currentPort === '' || window.location.protocol === 'file:') {
+            API_BASE = 'http://localhost:5001';
+            console.log('检测到Live Server或直接打开文件，API请求将发送到:', API_BASE);
+        }
+
+        const BROAD_CATEGORIES = [
+            "数学", "力学", "物理学", "化学", "天文学", "地球科学", "生物学",
+            "农学", "林学", "畜牧/兽医科学", "水产学", "医药卫生",
+            "测绘科学技术", "材料科学与工程", "冶金工程技术", "机械与运载工程",
+            "核科学技术", "电子与通信技术", "计算机科学技术", "化学工程",
+            "轻工纺织科学技术", "食品科学技术", "土木建筑工程", "水利工程",
+            "交通运输", "航空航天科学技术", "环境及资源", "安全科学技术",
+            "管理学", "社会人文", "其他"
+        ];
+
+        // 初始化分类筛选标签
+        function initCategoryFilters() {
+            const filterContainer = document.getElementById('categoryFilters');
+            BROAD_CATEGORIES.forEach(category => {
+                const tag = document.createElement('span');
+                tag.className = 'filter-tag';
+                tag.textContent = category;
+                tag.onclick = () => toggleCategoryFilter(category, tag);
+                filterContainer.appendChild(tag);
+            });
+        }
+
+        let selectedCategories = [];
+
+        function toggleCategoryFilter(category, element) {
+            if (selectedCategories.includes(category)) {
+                selectedCategories = selectedCategories.filter(c => c !== category);
+                element.classList.remove('active');
+            } else {
+                selectedCategories.push(category);
+                element.classList.add('active');
+            }
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchQuery').value.trim();
+            if (!query) {
+                showStatus('searchStatus', '请输入搜索关键词', 'error');
+                return;
+            }
+
+            // 获取Gemini API Key（从localStorage）
+            let geminiKey = '';
+            try {
+                geminiKey = localStorage.getItem('globalGeminiKey') || '';
+            } catch (e) {
+                console.log('无法从localStorage获取API Key:', e);
+            }
+            
+            if (!geminiKey) {
+                showStatus('searchStatus', '请在 <a href="index.html" style="color: #667eea; text-decoration: underline;">Video Content Analysis</a> 页面的全局配置中输入 Gemini API Key', 'error');
+                return;
+            }
+
+            showLoading('searchLoading', true);
+            hideStatus('searchStatus');
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('noResults').classList.remove('show');
+            document.getElementById('aiAnalysis').classList.remove('show');
+            document.getElementById('searchBtn').disabled = true;
+            
+            fetch(`${API_BASE}/api/rag/search`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    query: query,
+                    categories: selectedCategories,
+                    api_key: geminiKey
+                })
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`服务器错误 (${response.status}): ${errorText || response.statusText}`);
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error(`服务器返回非 JSON 响应: ${text.substring(0, 200)}`);
+                }
+                
+                return response.json();
+            })
+            .then(data => {
+                showLoading('searchLoading', false);
+                document.getElementById('searchBtn').disabled = false;
+
+                if (data.success) {
+                    // 显示AI分析结果
+                    if (data.analysis) {
+                        displayAIAnalysis(data.analysis);
+                    }
+
+                    // 显示搜索结果
+                    if (data.results && data.results.length > 0) {
+                        displayResults(data.results);
+                        document.getElementById('noResults').classList.remove('show');
+                    } else {
+                        document.getElementById('noResults').classList.add('show');
+                    }
+                } else {
+                    showStatus('searchStatus', data.error || '搜索失败', 'error');
+                    document.getElementById('noResults').classList.add('show');
+                }
+            })
+            .catch(error => {
+                showLoading('searchLoading', false);
+                document.getElementById('searchBtn').disabled = false;
+                showStatus('searchStatus', '搜索失败: ' + error.message, 'error');
+                console.error('搜索错误:', error);
+            });
+        }
+
+        function displayAIAnalysis(analysis) {
+            const analysisDiv = document.getElementById('aiAnalysis');
+            const contentDiv = document.getElementById('aiAnalysisContent');
+            
+            let html = '';
+            
+            if (analysis.categories && analysis.categories.length > 0) {
+                html += '<div style="margin-bottom: 15px;"><strong>锁定分类:</strong> ';
+                html += '<div class="category-tags">';
+                analysis.categories.forEach(cat => {
+                    html += `<span class="category-tag">${cat}</span>`;
+                });
+                html += '</div></div>';
+            }
+
+            if (analysis.keywords && analysis.keywords.length > 0) {
+                html += '<div><strong>扩展关键词:</strong> ';
+                html += '<div class="category-tags">';
+                analysis.keywords.forEach(kw => {
+                    html += `<span class="keyword-tag">${kw}</span>`;
+                });
+                html += '</div></div>';
+            }
+
+            contentDiv.innerHTML = html;
+            analysisDiv.classList.add('show');
+        }
+
+        // 简单的Markdown转HTML函数（处理粗体、斜体、链接等）
+        function markdownToHtml(markdown) {
+            if (!markdown) return '';
+            
+            let html = markdown;
+            
+            // 转义HTML特殊字符（但保留markdown格式）
+            html = html.replace(/&/g, '&amp;')
+                       .replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;');
+            
+            // 处理粗体 **text** 或 __text__
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+            
+            // 处理斜体 *text* 或 _text_
+            html = html.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
+            html = html.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em>$1</em>');
+            
+            // 处理链接 [text](url)
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color: #667eea;">$1</a>');
+            
+            // 处理换行（两个换行符为段落，单个换行符为<br>）
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = html.replace(/\n/g, '<br>');
+            
+            // 包装段落
+            if (html && !html.startsWith('<p>')) {
+                html = '<p>' + html + '</p>';
+            }
+            
+            return html;
+        }
+
+        function displayResults(results) {
+            const resultsContainer = document.getElementById('searchResults');
+            resultsContainer.innerHTML = '';
+
+            results.forEach((result, index) => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'result-item';
+                
+                const metadata = result.metadata || {};
+                const summary = result.text || result.content || ''; // 这是核心摘要
+                const fullText = result.full_text || summary; // 完整文本作为backup
+                const score = result.score ? `相似度: ${(result.score * 100).toFixed(1)}%` : '';
+                
+                // 将markdown转换为HTML
+                const summaryHtml = markdownToHtml(summary);
+                const fullTextHtml = markdownToHtml(fullText);
+
+                let categoriesHtml = '';
+                if (metadata.categories && Array.isArray(metadata.categories)) {
+                    categoriesHtml = metadata.categories.map(cat => 
+                        `<span class="result-category">${cat}</span>`
+                    ).join('');
+                }
+
+                resultDiv.innerHTML = `
+                    <div class="result-header">
+                        <div style="flex: 1;">
+                            <div class="result-title">${metadata.title || `结果 ${index + 1}`}</div>
+                            <div class="result-meta">
+                                ${metadata.speaker ? `<span> 报告人: ${metadata.speaker}</span>` : ''}
+                                ${metadata.organization ? `<span> 机构: ${metadata.organization}</span>` : ''}
+                                ${metadata.year ? `<span> 年份: ${metadata.year}</span>` : ''}
+                                ${metadata.forum ? `<span> 论坛: ${metadata.forum}</span>` : ''}
+                                ${score ? `<span style="color: #667eea;">${score}</span>` : ''}
+                            </div>
+                            ${categoriesHtml ? `<div class="result-categories">${categoriesHtml}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="result-content" id="content-${index}" data-full-content="${fullTextHtml.replace(/"/g, '&quot;')}" data-summary="${summaryHtml.replace(/"/g, '&quot;')}">
+                        ${summaryHtml}
+                    </div>
+                    ${fullText.length > summary.length ? `<div class="expand-btn" id="expand-btn-${index}" onclick="toggleExpand(${index})">展开全文</div>` : ''}
+                    ${metadata.original_url ? `<div style="margin-top: 10px;"><a href="${metadata.original_url}" target="_blank" style="color: #667eea; text-decoration: none;"> 查看原文</a></div>` : ''}
+                `;
+
+                resultsContainer.appendChild(resultDiv);
+            });
+        }
+
+        function toggleExpand(index) {
+            const contentDiv = document.getElementById(`content-${index}`);
+            const expandBtn = document.getElementById(`expand-btn-${index}`);
+            if (!contentDiv || !expandBtn) return;
+            const fullContent = contentDiv.getAttribute('data-full-content');
+            const isExpanded = contentDiv.classList.contains('expanded');
+            
+            if (isExpanded) {
+                // 收起：显示摘要（从第一个结果中获取摘要）
+                const summary = contentDiv.getAttribute('data-summary') || '';
+                contentDiv.innerHTML = summary;
+                contentDiv.classList.remove('expanded');
+                expandBtn.textContent = '展开全文';
+            } else {
+                // 展开：显示完整内容
+                contentDiv.innerHTML = fullContent;
+                contentDiv.classList.add('expanded');
+                expandBtn.textContent = '收起';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showStatus(id, message, type) {
+            const status = document.getElementById(id);
+            status.textContent = message;
+            status.className = `status ${type} show`;
+        }
+
+        function hideStatus(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        function showLoading(id, show) {
+            document.getElementById(id).classList.toggle('show', show);
+        }
+
+        document.getElementById('searchQuery').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        initCategoryFilters();
+    </script>
+</body>
+</html>
