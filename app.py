@@ -17,6 +17,8 @@ import shutil
 import whisper
 import sys
 import traceback
+import threading
+from datetime import datetime
 
 # 添加父目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -1225,15 +1227,6 @@ def rag_search():
             'error': f'搜索失败: {str(e)}',
             'detail': error_trace[-500:] if len(error_trace) > 500 else error_trace
         }), 500
-
-# ==========================================
-# 新增：后台管理与知识库更新逻辑
-# ==========================================
-import threading
-from datetime import datetime
-
-# 设置一个简单的管理员密码
-ADMIN_PASSWORD = "admin"  # 建议修改复杂一点
 
 def mock_crawl_latest_urls():
     """
