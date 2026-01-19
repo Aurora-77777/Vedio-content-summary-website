@@ -27,6 +27,29 @@ from datetime import datetime
 # 添加父目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+# 加载 .env 文件（如果存在）
+try:
+    from dotenv import load_dotenv
+    # 尝试从多个位置加载 .env 文件
+    env_paths = [
+        Path(__file__).parent / 'templates' / '.env',  # templates 目录（web/Vedio-content-summary-website/templates/.env）
+        Path(__file__).parent / '.env',  # 当前目录（web/Vedio-content-summary-website/.env）
+        Path(__file__).parent.parent.parent / '.env',  # 项目根目录（前沿论坛识别视频/.env）
+    ]
+    loaded = False
+    for env_path in env_paths:
+        if env_path.exists():
+            load_dotenv(env_path)
+            print(f"✅ 已加载 .env 文件: {env_path}")
+            loaded = True
+            break
+    if not loaded:
+        print(f"ℹ️ 未找到 .env 文件，尝试位置: {[str(p) for p in env_paths]}")
+        # 如果没有找到，尝试从当前工作目录加载
+        load_dotenv()  # 这会查找当前目录和父目录的 .env 文件
+except ImportError:
+    print("⚠️ python-dotenv 未安装，无法加载 .env 文件。如需使用 .env，请运行: pip install python-dotenv")
+
 app = Flask(__name__)
 CORS(app)
 
@@ -209,13 +232,20 @@ try:
 except ImportError as e:
     print(f"警告: RAG模块未安装: {e}")
 
+# RAG数据库配置
+PROJECT_REF = "ivngzzdpdvcryhzevhsi"
 RAG_DB_CONFIG = {
-    'DB_NAME': 'postgres' 
-    'DB_USER': 'postgres.ivngzzdpdvcryhzevhsi' 
-    'DB_PASSWORD': 'ZssHjq19880302_' 
-    'DB_HOST': 'aws-0-ap-southeast-1.pooler.supabase.com' 
-    'DB_PORT': '6543'            
+    'DB_PASSWORD': "ZssHjq19880302_",
+    'PROJECT_REF': PROJECT_REF,
+    'DB_NAME': "postgres",
+    'DB_USER': "postgres",
+    'DB_HOST': f"db.{PROJECT_REF}.supabase.co",
+    'DB_PORT': "5432",
+    'TABLE_NAME': "cas_reports"
 }
+
+# 管理员密码（用于后台管理页面）
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')  # 默认密码，建议通过环境变量设置
 
 BROAD_CATEGORIES = [
     "数学", "力学", "物理学", "化学", "天文学", "地球科学", "生物学",
@@ -646,7 +676,7 @@ class SmartSearchEngine:
                             # 如果没有找到【核心摘要】，使用text的前500字符作为摘要
                             summary = text[:500] + ('...' if len(text) > 500 else '')
                     
-                    # 如果该报告已存在，比较相似度，保留更高的
+                    # 如果该报告已存在，比较相似度，保留更高
                     if unique_key in results_dict:
                         if score > (results_dict[unique_key].get('score') or 0):
                             results_dict[unique_key] = {
@@ -800,7 +830,7 @@ def extract_keywords():
                 result = json.loads(resp.choices[0].message.content.strip())
                 keywords = result.get('keywords', [])
                 method = 'openai'
-                
+            
             return jsonify({
                 'success': True,
                 'keywords': keywords,
@@ -818,7 +848,7 @@ def extract_keywords():
                 'keywords_str': '，'.join(keywords_dict['all']),
                 'method': 'jieba'
             })
-            
+    
     except Exception as e:
         return jsonify({'success': False, 'error': f'关键词提取失败: {str(e)}'}), 500
 
@@ -976,7 +1006,7 @@ def process_video_url_api():
     "transcript": "完整的转录文本内容...",
     "keywords": ["关键词1", "关键词2", "关键词3", ...]
 }}"""
-
+        
                     response = client.models.generate_content(
                         model=GEMINI_MODEL,
                         contents=[

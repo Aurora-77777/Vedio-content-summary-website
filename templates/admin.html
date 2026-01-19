@@ -49,6 +49,11 @@
         // 尝试自动填充Key
         document.getElementById('embeddingKey').value = localStorage.getItem('globalGeminiKey') || '';
 
+        // 自动检测API基础URL
+        const API_BASE = window.location.origin.includes('5500') || window.location.protocol === 'file:'
+            ? 'http://localhost:5001'  // 如果通过Live Server或直接打开文件，使用Flask服务器地址
+            : '';  // 如果通过Flask服务器打开，使用相对路径
+
         async function performUpdate() {
             const password = document.getElementById('adminPassword').value;
             const apiKey = document.getElementById('embeddingKey').value;
@@ -65,26 +70,35 @@
             status.style.display = 'none';
 
             try {
-                const res = await fetch('/api/admin/update-db', {
+                const res = await fetch(`${API_BASE}/api/admin/update-db`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ password: password, api_key: apiKey })
                 });
                 
-                const data = await res.json();
+                // 尝试解析响应（无论状态码如何）
+                let data;
+                try {
+                    data = await res.json();
+                } catch (jsonError) {
+                    // 如果无法解析JSON，使用状态码错误
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 
                 status.style.display = 'block';
-                if (data.success) {
+                if (res.ok && data.success) {
                     status.className = 'success';
                     status.textContent = '✅ ' + data.message;
                 } else {
                     status.className = 'error';
-                    status.textContent = '❌ ' + data.error;
+                    // 显示后端返回的具体错误消息，如果没有则显示HTTP状态
+                    status.textContent = '❌ ' + (data.error || `HTTP ${res.status}: ${res.statusText}`);
                 }
             } catch (e) {
                 status.style.display = 'block';
                 status.className = 'error';
-                status.textContent = '❌ 网络请求失败';
+                status.textContent = '❌ 网络请求失败: ' + e.message + '。请确保Flask服务器正在运行 (http://localhost:5001)';
+                console.error('请求失败:', e);
             } finally {
                 btn.disabled = false;
                 btn.textContent = '🔄 一键检测并更新知识库';
