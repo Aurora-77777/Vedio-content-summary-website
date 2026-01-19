@@ -1,3 +1,12 @@
+---
+title: Cas Report Agent
+emoji: 📊
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
+
 # 📹 视频内容分析与专家观点生成工具
 
 ## 🎯 功能概述
