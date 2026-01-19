@@ -1,3 +1,7 @@
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import time
 from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 import os
@@ -25,6 +29,85 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 app = Flask(__name__)
 CORS(app)
+
+# ==========================================
+# 👇 爬虫辅助函数 (从你的 scraper.py 移植)
+# ==========================================
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/120.0.0.0 Safari/537.36"
+}
+
+def fetch_soup(url: str, timeout: int = 20) -> BeautifulSoup:
+    """获取并解析网页，处理编码问题"""
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=timeout)
+        r.raise_for_status()
+        html = r.content.decode("utf-8", errors="replace")
+        return BeautifulSoup(html, "lxml") # 如果报错 lxml not found，请改成 "html.parser"
+    except Exception as e:
+        print(f"Error fetching {url}: {e}")
+        return None
+
+def parse_year_links(root_url: str) -> list[dict]:
+    """解析年份列表"""
+    soup = fetch_soup(root_url)
+    if not soup: return []
+
+    years = []
+    seen = set()
+    for a in soup.select("div.luntan-year-swiper a.year-box"):
+        year_span = a.select_one("span.big")
+        if not year_span: continue
+        year = year_span.get_text(strip=True)
+        href = a.get("href", "").strip()
+        if not href: continue
+        year_url = urljoin(root_url, href)
+        if year in seen: continue
+        seen.add(year)
+        years.append({"year": year, "year_url": year_url if year_url.endswith("/") else year_url + "/"})
+    return years
+
+def parse_year_forums(year_url: str) -> list[dict]:
+    """解析某年份下的所有论坛版块"""
+    soup = fetch_soup(year_url)
+    if not soup: return []
+    forums = []
+    seen = set()
+    # 逻辑和你之前的一样
+    for a in soup.select('a[href*="/d"][href$="/"]'):
+        href = a.get("href", "").strip()
+        if not href: continue
+        forum_url = href if href.startswith("http") else urljoin(year_url, href)
+        if "/xshd/kxyjsqylt/" not in forum_url: continue
+        if f"/{year_url.rstrip('/').split('/')[-1]}/" not in forum_url: continue
+        forum_id = forum_url.rstrip("/").split("/")[-1]
+        if forum_id in seen: continue
+        seen.add(forum_id)
+        forums.append({"forum_id": forum_id, "forum_url": forum_url})
+    return forums
+
+def parse_page_urls(forum_url: str) -> list[str]:
+    """解析该论坛下的所有文章URL (detail_url)"""
+    soup = fetch_soup(forum_url) # 默认只爬第一页以节省时间，如需全爬参考 scraper.py
+    if not soup: return []
+    
+    urls = []
+    # 使用你修改后的 parse_page 逻辑，这里只提取 url
+    for li in soup.select("ul#content > li.tuwen-list"):
+        twen = li.select_one("div.twen-info")
+        if not twen: continue
+        
+        # 获取详情页链接
+        title_a = twen.select_one("a.overfloat-dot-2")
+        if title_a and title_a.has_attr("href"):
+            detail_url = urljoin(forum_url, title_a["href"])
+            if detail_url:
+                urls.append(detail_url)
+    return urls
+
 
 GEMINI_MODEL = "gemini-2.5-pro"
 OPENAI_MODEL = "gpt-5.1"
@@ -1228,17 +1311,50 @@ def rag_search():
             'detail': error_trace[-500:] if len(error_trace) > 500 else error_trace
         }), 500
 
-def mock_crawl_latest_urls():
+def crawl_latest_report_urls():
     """
-    [需自定义] 爬虫函数：获取最新的报告URL列表
-    这里应该实现真实的爬虫逻辑，比如访问CAS官网解析列表
+    [真实爬虫] 获取最新年份的所有报告 URL
     """
-    print("正在爬取最新报告列表...")
-    # 示例数据
-    return [
-        "https://example.com/report1",
-        "https://example.com/report2"
-    ]
+    print("🕷️ 开始爬取 CAS 官网最新报告列表...")
+    root = "https://academics.casad.cas.cn/xshd/kxyjsqylt/"
+    
+    all_report_urls = []
+    
+    try:
+        # 1. 获取所有年份
+        years = parse_year_links(root)
+        if not years:
+            print("⚠️ 未找到年份信息")
+            return []
+            
+        # 2. 【策略】只爬取最新的 1 个年份 (通常是列表第一个)
+        # 如果需要爬更多年份，可以修改切片，例如 years[:2]
+        latest_year = years[0] 
+        print(f"📅 正在处理最新年份: {latest_year['year']}")
+        
+        # 3. 获取该年份下的所有论坛 (d204c, d203c...)
+        forums = parse_year_forums(latest_year["year_url"])
+        print(f"📚 发现 {len(forums)} 个论坛版块")
+        
+        # 4. 遍历每个论坛，获取里面的文章链接
+        for f in forums:
+            # print(f"  正在抓取版块: {f['forum_id']}...")
+            # 为了速度，这里只爬取每个版块的第 1 页 (index.html)
+            # 如果你想爬每个版块的所有分页，需要引入 build_page_urls 逻辑
+            forum_urls = parse_page_urls(f["forum_url"])
+            all_report_urls.extend(forum_urls)
+            # 礼貌性延时，防止被封 IP
+            time.sleep(0.1)
+            
+    except Exception as e:
+        print(f"❌ 爬虫出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+    print(f"✅ 爬取完成，共找到 {len(all_report_urls)} 个报告链接")
+    # 去重
+    return list(set(all_report_urls))
+
 
 def background_update_task(api_key):
     """后台执行的更新任务"""
@@ -1251,7 +1367,7 @@ def background_update_task(api_key):
         engine = init_rag_engine(api_key=api_key)
         
         # 2. 获取最新 URL
-        latest_urls = mock_crawl_latest_urls()
+        latest_urls = crawl_latest_report_urls()
         
         # 3. 检查数据库中已存在的 URL (防止重复)
         # 这里使用简单的 SQL 查询或者通过 LlamaIndex 的 docstore 检查

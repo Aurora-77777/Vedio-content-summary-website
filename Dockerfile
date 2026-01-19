@@ -29,4 +29,4 @@ RUN mkdir -p uploads transcripts transcripts_clean && \
 EXPOSE 7860
 
 # 8. 启动命令 (指定端口 7860)
-CMD ["python", "app.py", "7860"]
+CMD ["python", "app.py", "7860"]# force rebuild
