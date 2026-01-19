@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统后台管理</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 40px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 12px; background: #d9534f; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+        .btn:hover { background: #c9302c; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        #status { margin-top: 20px; padding: 10px; border-radius: 6px; display: none; text-align: center; }
+        .success { background: #dff0d8; color: #3c763d; }
+        .error { background: #f2dede; color: #a94442; }
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #666; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 知识库后台管理</h1>
+        <p style="color: #666; text-align: center; margin-bottom: 30px;">
+            一键爬取最新报告并更新向量数据库
+        </p>
+
+        <div class="form-group">
+            <label>管理员密码:</label>
+            <input type="password" id="adminPassword" placeholder="请输入管理员密码">
+        </div>
+
+        <div class="form-group">
+            <label>Gemini API Key (用于向量生成):</label>
+            <input type="password" id="embeddingKey" placeholder="输入 Key">
+            <small style="color: #999;">如果系统已配置全局Key，此处可留空(需修改代码适配)</small>
+        </div>
+
+        <button class="btn" id="updateBtn" onclick="performUpdate()">🔄 一键检测并更新知识库</button>
+        
+        <div id="status"></div>
+        
+        <a href="/" class="back-link">← 返回首页</a>
+    </div>
+
+    <script>
+        // 尝试自动填充Key
+        document.getElementById('embeddingKey').value = localStorage.getItem('globalGeminiKey') || '';
+
+        async function performUpdate() {
+            const password = document.getElementById('adminPassword').value;
+            const apiKey = document.getElementById('embeddingKey').value;
+            const btn = document.getElementById('updateBtn');
+            const status = document.getElementById('status');
+
+            if (!password) {
+                alert('请输入管理员密码');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '正在发送指令...';
+            status.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/admin/update-db', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ password: password, api_key: apiKey })
+                });
+                
+                const data = await res.json();
+                
+                status.style.display = 'block';
+                if (data.success) {
+                    status.className = 'success';
+                    status.textContent = '✅ ' + data.message;
+                } else {
+                    status.className = 'error';
+                    status.textContent = '❌ ' + data.error;
+                }
+            } catch (e) {
+                status.style.display = 'block';
+                status.className = 'error';
+                status.textContent = '❌ 网络请求失败';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 一键检测并更新知识库';
+            }
+        }
+    </script>
+</body>
+</html>

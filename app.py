@@ -124,14 +124,12 @@ try:
 except ImportError as e:
     print(f"警告: RAG模块未安装: {e}")
 
-# RAG数据库配置
 RAG_DB_CONFIG = {
-    'DB_NAME': 'postgres',
-    'DB_USER': 'postgres',
-    'DB_PASSWORD': 'mysecretpassword',
-    'DB_HOST': 'localhost',
-    'DB_PORT': '5433',
-    'TABLE_NAME': 'cas_reports'
+    'DB_NAME': 'postgres' 
+    'DB_USER': 'postgres.ivngzzdpdvcryhzevhsi' 
+    'DB_PASSWORD': 'ZssHjq19880302_' 
+    'DB_HOST': 'aws-0-ap-southeast-1.pooler.supabase.com' 
+    'DB_PORT': '6543'            
 }
 
 BROAD_CATEGORIES = [
@@ -1227,6 +1225,100 @@ def rag_search():
             'error': f'搜索失败: {str(e)}',
             'detail': error_trace[-500:] if len(error_trace) > 500 else error_trace
         }), 500
+
+# ==========================================
+# 新增：后台管理与知识库更新逻辑
+# ==========================================
+import threading
+from datetime import datetime
+
+# 设置一个简单的管理员密码
+ADMIN_PASSWORD = "admin"  # 建议修改复杂一点
+
+def mock_crawl_latest_urls():
+    """
+    [需自定义] 爬虫函数：获取最新的报告URL列表
+    这里应该实现真实的爬虫逻辑，比如访问CAS官网解析列表
+    """
+    print("正在爬取最新报告列表...")
+    # 示例数据
+    return [
+        "https://example.com/report1",
+        "https://example.com/report2"
+    ]
+
+def background_update_task(api_key):
+    """后台执行的更新任务"""
+    print(f"[{datetime.now()}] 🚀 开始执行知识库更新任务...")
+    
+    try:
+        # 1. 初始化 RAG 引擎 (连接数据库)
+        # 注意：这里需要确保使用了正确的 Embedding 模型对应的 API Key
+        # 如果是国内环境，建议换成 HuggingFaceEmbedding (本地模型) 就不需要这个 Key 了
+        engine = init_rag_engine(api_key=api_key)
+        
+        # 2. 获取最新 URL
+        latest_urls = mock_crawl_latest_urls()
+        
+        # 3. 检查数据库中已存在的 URL (防止重复)
+        # 这里使用简单的 SQL 查询或者通过 LlamaIndex 的 docstore 检查
+        # 为简化演示，这里假设所有爬到的都是新的
+        new_urls = latest_urls 
+        
+        if not new_urls:
+            print("没有发现新内容。")
+            return
+
+        print(f"发现 {len(new_urls)} 个新报告，开始处理...")
+        
+        # 4. 处理新内容 (下载 -> 转录 -> 向量化 -> 入库)
+        new_documents = []
+        
+        # ⚠️ 这里需要你复用 build_index.py 里的逻辑或者 download_video 逻辑
+        # from gemini_try import download_video
+        # for url in new_urls:
+        #     local_video, web_text = download_video(url, "temp.mp4")
+        #     transcript = transcribe_with_whisper(local_video)
+        #     doc = Document(text=transcript, metadata={"original_url": url, "summary": web_text})
+        #     new_documents.append(doc)
+        
+        # 5. 插入数据库
+        if new_documents:
+            engine.index.insert_nodes(new_documents)
+            print(f"✅ 成功更新 {len(new_documents)} 条数据到知识库！")
+        else:
+            print("⚠️ 未生成有效文档，更新跳过。")
+            
+    except Exception as e:
+        print(f"❌ 更新任务失败: {str(e)}")
+        traceback.print_exc()
+
+@app.route('/admin')
+def admin_page():
+    """后台管理页面"""
+    return render_template('admin.html')
+
+@app.route('/api/admin/update-db', methods=['POST'])
+def trigger_update_db():
+    """触发更新的接口"""
+    data = request.json
+    password = data.get('password')
+    api_key = data.get('api_key')
+    
+    if password != ADMIN_PASSWORD:
+        return jsonify({'success': False, 'error': '管理员密码错误'}), 401
+    
+    if not api_key:
+        return jsonify({'success': False, 'error': '需要提供 API Key 用于生成向量'}), 400
+
+    # 启动后台线程，避免卡死网页
+    thread = threading.Thread(target=background_update_task, args=(api_key,))
+    thread.start()
+    
+    return jsonify({
+        'success': True, 
+        'message': '更新任务已在后台启动，请关注服务器日志或稍后刷新数据库。'
+    })
 
 
 if __name__ == '__main__':
